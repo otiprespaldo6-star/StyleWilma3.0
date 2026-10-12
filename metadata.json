@@ -1,0 +1,10 @@
+{
+  "name": "Style By Wilma 3.0",
+  "description": "AI-powered color analysis app to discover your perfect color palette, style, and makeup recommendations to shine everyday.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

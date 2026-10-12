@@ -1,0 +1,29 @@
+name = "styled-by-wilma"
+main = "server.ts"
+compatibility_date = "2024-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[site]
+bucket = "./dist"
+
+# D1 Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "styled-by-wilma-db"
+database_id = "styled-by-wilma-d1-prod"
+
+# R2 Object Storage for Photos and Assets
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "styled-by-wilma-storage"
+
+# KV Namespaces for Fast Sessions and Rate Limiting
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "styled-by-wilma-sessions-kv"
+
+[vars]
+APP_NAME = "Styled By Wilma"
+DEFAULT_REGION = "Biobío"
+DEFAULT_CITY = "Concepción"
+ENVIRONMENT = "production"
