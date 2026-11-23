@@ -17,6 +17,8 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
+import { generateSourceZipBuffer } from './scripts/export-source';
+
 // Initialize Gemini Client
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -25,6 +27,20 @@ const ai = new GoogleGenAI({
       'User-Agent': 'aistudio-build',
     },
   },
+});
+
+// API endpoint for Source Code ZIP Export (Panel Master)
+app.get('/api/admin/export-source', async (_req: Request, res: Response) => {
+  try {
+    const buffer = await generateSourceZipBuffer();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="styled-by-wilma-source.zip"');
+    res.setHeader('Content-Length', buffer.length.toString());
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('Error al generar zip del código fuente:', error);
+    res.status(500).json({ error: 'Error al empaquetar código fuente' });
+  }
 });
 
 // API endpoint for AI Colorimetry Photo Analysis

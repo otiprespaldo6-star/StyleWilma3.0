@@ -1,6 +1,23 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import { ManualChapter, VisitRecord } from '../types';
+import { ManualChapter, VisitRecord, UserProfile } from '../types';
+import { AnalysisResult } from './colorAnalysis';
+
+/**
+ * Helper to convert HEX to RGB for jsPDF fill
+ */
+function parseHexToRgb(hex: string): [number, number, number] {
+  if (!hex) return [140, 140, 140];
+  let clean = hex.replace('#', '').trim();
+  if (clean.length === 3) {
+    clean = clean.split('').map(c => c + c).join('');
+  }
+  if (clean.length !== 6) return [140, 140, 140];
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return [isNaN(r) ? 140 : r, isNaN(g) ? 140 : g, isNaN(b) ? 140 : b];
+}
 
 /**
  * Export any array of objects to Excel .xlsx file
@@ -293,3 +310,528 @@ export function exportVisitsToPDF(visits: VisitRecord[]) {
     return false;
   }
 }
+
+/**
+ * Export complete color analysis dossier as a beautifully styled, downloadable PDF
+ */
+export function exportColorAnalysisToPDF(
+  analysis: AnalysisResult,
+  user?: UserProfile | null,
+  options?: { customFileName?: string }
+): boolean {
+  try {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+    const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+    const margin = 14;
+    const contentWidth = pageWidth - margin * 2; // 182mm
+    const season = analysis.season;
+    const userName = user?.displayName || user?.firstName || 'Usuaria de Atelier';
+    const primaryHex = season.palette[0]?.hex || '#E11D48';
+    const [themeR, themeG, themeB] = parseHexToRgb(primaryHex);
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PÁGINA 1: PORTADA & RESUMEN DE ESTACIÓN & PALETA CROMÁTICA MAESTRA
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 1. Top Atelier Brand Header Bar
+    doc.setFillColor(24, 20, 22);
+    doc.rect(0, 0, pageWidth, 20, 'F');
+
+    // Decorative Gold Accent Strip
+    doc.setFillColor(212, 165, 116);
+    doc.rect(0, 19, pageWidth, 1.2, 'F');
+
+    // Atelier Brandmark
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(245, 235, 230);
+    doc.text('STYLED BY WILMA', margin, 11);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(200, 190, 185);
+    doc.text('ATELIER DE COLORIMETRÍA PERSONAL & ASESORÍA DE IMAGEN • CONCEPCIÓN, CHILE', margin, 15.5);
+
+    // Document Code / Seal on top right
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(212, 165, 116);
+    doc.text('INFORME CROMÁTICO OFICIAL', pageWidth - margin, 11, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(170, 160, 155);
+    doc.text(`CERTIFICADO #${analysis.id.slice(-6).toUpperCase()}`, pageWidth - margin, 15.5, { align: 'right' });
+
+    let y = 26;
+
+    // 2. Client Dossier Summary Card
+    doc.setFillColor(250, 248, 246);
+    doc.roundedRect(margin, y, contentWidth, 22, 2.5, 2.5, 'F');
+    doc.setDrawColor(235, 225, 220);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(margin, y, contentWidth, 22, 2.5, 2.5, 'S');
+
+    // Column 1: Client Name
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(140, 120, 115);
+    doc.text('CLIENTE / TITULAR:', margin + 4, y + 6);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(40, 30, 35);
+    doc.text(userName, margin + 4, y + 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 110, 105);
+    doc.text(`Subtono detectado: ${season.characteristics.undertone}`, margin + 4, y + 18);
+
+    // Column 2: Diagnostic Method & Date
+    const col2X = margin + 70;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(140, 120, 115);
+    doc.text('MÉTODO DE DIAGNÓSTICO:', col2X, y + 6);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(50, 40, 45);
+    doc.text(analysis.method === 'photo' ? 'Escaneo Facial con IA (Biometría)' : 'Cuestionario de 7 Pasos', col2X, y + 12);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 110, 105);
+    const dateFormatted = new Date().toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' });
+    doc.text(`Fecha de emisión: ${dateFormatted}`, col2X, y + 18);
+
+    // Column 3: Confidence Score Badge
+    const col3X = pageWidth - margin - 38;
+    doc.setFillColor(242, 248, 244);
+    doc.roundedRect(col3X, y + 3, 34, 16, 2, 2, 'F');
+    doc.setDrawColor(180, 220, 195);
+    doc.roundedRect(col3X, y + 3, 34, 16, 2, 2, 'S');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(40, 120, 70);
+    doc.text('AFINIDAD CROMÁTICA', col3X + 17, y + 8, { align: 'center' });
+    doc.setFontSize(11);
+    doc.text(`${Math.round(analysis.confidence * 100)}% MATCH`, col3X + 17, y + 15, { align: 'center' });
+
+    y += 26;
+
+    // 3. Hero Season Card
+    doc.setFillColor(28, 22, 26);
+    doc.roundedRect(margin, y, contentWidth, 42, 3, 3, 'F');
+
+    // Colored accent left border
+    doc.setFillColor(themeR, themeG, themeB);
+    doc.roundedRect(margin, y, 4, 42, 1, 1, 'F');
+
+    // Season Subfamily Pill
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(212, 165, 116);
+    doc.text(`FAMILIA DE LAS 12 ESTACIONES • ${season.subfamily.toUpperCase()}`, margin + 8, y + 8);
+
+    // Main Season Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(255, 255, 255);
+    doc.text(season.spanishTitle.toUpperCase(), margin + 8, y + 16);
+
+    // Power Quote
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(240, 210, 215);
+    const quoteLines = doc.splitTextToSize(`"${season.powerQuote}"`, contentWidth - 16);
+    doc.text(quoteLines, margin + 8, y + 22);
+
+    // Essence / Description excerpt
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(210, 205, 205);
+    const descLines = doc.splitTextToSize(season.description, contentWidth - 16);
+    doc.text(descLines.slice(0, 2), margin + 8, y + 31);
+
+    y += 46;
+
+    // 4. Four Technical Dimension Indicators
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(70, 60, 65);
+    doc.text('PARÁMETROS CROMÁTICOS DE TU ARMONÍA:', margin, y + 1);
+    y += 4;
+
+    const metricBoxW = (contentWidth - 6) / 4;
+    const metrics = [
+      { label: 'Temperatura', val: season.characteristics.undertone, sub: `${analysis.scores.warmth}% Cálido` },
+      { label: 'Claridad', val: season.characteristics.value, sub: `${analysis.scores.depth}% Profundo` },
+      { label: 'Saturación', val: season.characteristics.chroma, sub: `${analysis.scores.brightness}% Saturación` },
+      { label: 'Contraste', val: season.characteristics.contrast, sub: `${analysis.scores.contrast}% Contraste` },
+    ];
+
+    metrics.forEach((m, idx) => {
+      const bx = margin + idx * (metricBoxW + 2);
+      doc.setFillColor(252, 250, 248);
+      doc.roundedRect(bx, y, metricBoxW, 14, 1.5, 1.5, 'F');
+      doc.setDrawColor(230, 222, 218);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(bx, y, metricBoxW, 14, 1.5, 1.5, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(140, 120, 115);
+      doc.text(m.label.toUpperCase(), bx + 3, y + 4.5);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(40, 30, 35);
+      doc.text(m.val, bx + 3, y + 9);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(120, 100, 95);
+      doc.text(m.sub, bx + 3, y + 12.5);
+    });
+
+    y += 18;
+
+    // 5. Paleta Cromática Maestra (Visual Swatches with Exact Hex & Names)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(40, 30, 35);
+    doc.text('PALETA CROMÁTICA MAESTRA (MUESTRAS DE COLOR & CÓDIGOS HEX)', margin, y + 2);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(130, 115, 110);
+    doc.text('Lleva estos códigos cuando compres prendas, telas o accesorios para garantizar armonía absoluta.', margin, y + 6);
+    y += 9;
+
+    // Palette grid: 6 columns x 2 rows
+    const cols = 6;
+    const swatchW = (contentWidth - (cols - 1) * 3) / cols; // ~27.8mm
+    const swatchH = 26; // total height per item
+    const paletteItems = season.palette.slice(0, 12);
+
+    paletteItems.forEach((swatch, idx) => {
+      const row = Math.floor(idx / cols);
+      const col = idx % cols;
+      const sx = margin + col * (swatchW + 3);
+      const sy = y + row * (swatchH + 2.5);
+
+      const [sr, sg, sb] = parseHexToRgb(swatch.hex);
+
+      // Outer container card
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(sx, sy, swatchW, swatchH, 1.8, 1.8, 'F');
+      doc.setDrawColor(230, 220, 215);
+      doc.setLineWidth(0.25);
+      doc.roundedRect(sx, sy, swatchW, swatchH, 1.8, 1.8, 'S');
+
+      // Top colored swatch block
+      doc.setFillColor(sr, sg, sb);
+      doc.roundedRect(sx + 1.2, sy + 1.2, swatchW - 2.4, 15, 1.2, 1.2, 'F');
+      doc.setDrawColor(210, 200, 195);
+      doc.roundedRect(sx + 1.2, sy + 1.2, swatchW - 2.4, 15, 1.2, 1.2, 'S');
+
+      // Swatch Name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(40, 30, 35);
+      const truncatedName = swatch.name.length > 14 ? swatch.name.slice(0, 13) + '…' : swatch.name;
+      doc.text(truncatedName, sx + swatchW / 2, sy + 19.5, { align: 'center' });
+
+      // Hex Code
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(120, 105, 100);
+      doc.text(swatch.hex.toUpperCase(), sx + swatchW / 2, sy + 23.5, { align: 'center' });
+    });
+
+    y += 2 * (swatchH + 2.5) + 3;
+
+    // 6. Quick Rules of Season Banner
+    doc.setFillColor(248, 244, 240);
+    doc.roundedRect(margin, y, contentWidth, 22, 2, 2, 'F');
+    doc.setDrawColor(230, 215, 205);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(margin, y, contentWidth, 22, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(140, 70, 75);
+    doc.text('REGLAS DE ORO PARA TU ESTACIÓN:', margin + 4, y + 5.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(70, 60, 60);
+    const rule1 = `• Contraste Personal: Tu mejor imagen surge con contraste ${season.characteristics.contrast.toLowerCase()}. Evita prendas que neutralicen tu brillo.`;
+    const rule2 = `• Bases Neutras: Utiliza los tonos neutros de tu paleta como pilares para abrigos, sastrería y calzado.`;
+    const rule3 = `• Color de Poder: Lleva tus colores más vibrantes cerca del rostro para resaltar tu luminosidad natural.`;
+    doc.text(rule1, margin + 4, y + 10.5);
+    doc.text(rule2, margin + 4, y + 15);
+    doc.text(rule3, margin + 4, y + 19.5);
+
+    // Page 1 Footer
+    doc.setFillColor(212, 165, 116);
+    doc.rect(margin, pageHeight - 12, contentWidth, 0.4, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(140, 130, 125);
+    doc.text('Styled By Wilma • Concepción, Región del Biobío, Chile • Atelier de Colorimetría Personal', margin, pageHeight - 7);
+    doc.text('Página 1 de 2 • Conserva este informe', pageWidth - margin, pageHeight - 7, { align: 'right' });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PÁGINA 2: GUÍA DE ESTILISMO, JOYERÍA, MAQUILLAJE & ALERTAS CROMÁTICAS
+    // ═══════════════════════════════════════════════════════════════════════
+    doc.addPage();
+
+    // Page 2 Top Header
+    doc.setFillColor(24, 20, 22);
+    doc.rect(0, 0, pageWidth, 16, 'F');
+    doc.setFillColor(212, 165, 116);
+    doc.rect(0, 15, pageWidth, 1, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(245, 235, 230);
+    doc.text('STYLED BY WILMA — DOSSIER DE APLICACIÓN, JOYERÍA Y MAQUILLAJE', margin, 10.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(212, 165, 116);
+    doc.text(`ESTACIÓN: ${season.spanishTitle.toUpperCase()}`, pageWidth - margin, 10.5, { align: 'right' });
+
+    y = 22;
+
+    // SECTION A: Joyería & Metales
+    doc.setFillColor(252, 249, 245);
+    doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'F');
+    doc.setDrawColor(230, 220, 210);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, y, contentWidth, 30, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 80, 85);
+    doc.text('1. JOYERÍA Y METALES IDEALES PARA TU SUBTONO', margin + 4, y + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(50, 40, 45);
+    doc.text(`Metales recomendados: ${season.metals.best.join(' • ')}`, margin + 4, y + 12);
+    doc.text(`Acabado óptimo: ${season.metals.finish}`, margin + 4, y + 17);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(90, 80, 80);
+    const metalDescLines = doc.splitTextToSize(season.metals.description, contentWidth - 8);
+    doc.text(metalDescLines, margin + 4, y + 22);
+
+    y += 34;
+
+    // SECTION B: Tocador de Maquillaje (Labios, Rubor, Ojos)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(40, 30, 35);
+    doc.text('2. GUÍA DE MAQUILLAJE Y TONOS COSMÉTICOS', margin, y + 2);
+    y += 5;
+
+    const makeupItems = season.makeup.slice(0, 3);
+    const mCardW = (contentWidth - (makeupItems.length - 1) * 3) / makeupItems.length;
+    const mCardH = 46;
+
+    makeupItems.forEach((mItem, idx) => {
+      const mx = margin + idx * (mCardW + 3);
+
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(mx, y, mCardW, mCardH, 2, 2, 'F');
+      doc.setDrawColor(235, 225, 220);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(mx, y, mCardW, mCardH, 2, 2, 'S');
+
+      // Category Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(160, 60, 75);
+      doc.text(mItem.title.toUpperCase(), mx + 3, y + 6);
+
+      // Shades List with mini color dots
+      let syOffset = y + 11;
+      mItem.shades.slice(0, 3).forEach((sh) => {
+        const [cr, cg, cb] = parseHexToRgb(sh.hex);
+        doc.setFillColor(cr, cg, cb);
+        doc.circle(mx + 5, syOffset + 1.5, 2, 'F');
+        doc.setDrawColor(200, 190, 185);
+        doc.circle(mx + 5, syOffset + 1.5, 2, 'S');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(40, 35, 35);
+        const nameTrunc = sh.name.length > 18 ? sh.name.slice(0, 17) + '…' : sh.name;
+        doc.text(nameTrunc, mx + 9, syOffset + 2.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5.5);
+        doc.setTextColor(130, 120, 115);
+        doc.text(`${sh.finish} • ${sh.hex}`, mx + 9, syOffset + 6);
+
+        syOffset += 8;
+      });
+
+      // Makeup Tip
+      doc.setFillColor(250, 246, 242);
+      doc.roundedRect(mx + 2, y + 35, mCardW - 4, 9, 1, 1, 'F');
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(5.5);
+      doc.setTextColor(110, 85, 75);
+      const tipLines = doc.splitTextToSize(`Tip: ${mItem.tip}`, mCardW - 6);
+      doc.text(tipLines.slice(0, 2), mx + 3, y + 38.5);
+    });
+
+    y += mCardH + 5;
+
+    // SECTION C: Armario Cápsula & Fórmulas de Outfits
+    doc.setFillColor(248, 247, 245);
+    doc.roundedRect(margin, y, contentWidth, 36, 2, 2, 'F');
+    doc.setDrawColor(230, 222, 215);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, y, contentWidth, 36, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(50, 40, 45);
+    doc.text('3. ARMARIO CÁPSULA Y FÓRMULAS DE COMBINACIÓN DE WILMA', margin + 4, y + 6);
+
+    // Left Column: Capsule Essentials
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(140, 70, 80);
+    doc.text('Prendas Básicas Clave:', margin + 4, y + 11);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(70, 65, 65);
+    const capsuleExcerpts = season.capsuleWardrobe.slice(0, 4);
+    capsuleExcerpts.forEach((item, cIdx) => {
+      const truncatedItem = item.length > 55 ? item.slice(0, 53) + '…' : item;
+      doc.text(`• ${truncatedItem}`, margin + 4, y + 16 + cIdx * 4.5);
+    });
+
+    // Right Column: Outfit Formula
+    const outColX = margin + 94;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(140, 70, 80);
+    doc.text('Fórmula de Look Recomendada:', outColX, y + 11);
+    const formula = season.outfitFormulas[0] || {
+      title: 'Monocromático Texturizado',
+      description: 'Combina tonos de tu paleta variando texturas de tela para máxima sofisticación.'
+    };
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(40, 35, 40);
+    doc.text(formula.title, outColX, y + 16);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(80, 75, 75);
+    const formLines = doc.splitTextToSize(formula.description, contentWidth - 98);
+    doc.text(formLines, outColX, y + 21);
+
+    y += 40;
+
+    // SECTION D: Alertas Cromáticas (Colores a Evitar)
+    doc.setFillColor(254, 246, 246);
+    doc.roundedRect(margin, y, contentWidth, 32, 2, 2, 'F');
+    doc.setDrawColor(245, 215, 215);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(margin, y, contentWidth, 32, 2, 2, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(190, 40, 60);
+    doc.text('4. ALERTAS CROMÁTICAS: TONOS QUE DESFAVORECEN TU PIEL', margin + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 70, 70);
+    doc.text('Estos tonos suelen proyectar sombras o hacerte ver fatigada. Úsalos lejos del rostro o en calzado:', margin + 4, y + 10.5);
+
+    const avoidItems = season.avoidColors.slice(0, 3);
+    const aBoxW = (contentWidth - 8 - (avoidItems.length - 1) * 3) / avoidItems.length;
+
+    avoidItems.forEach((av, aIdx) => {
+      const ax = margin + 4 + aIdx * (aBoxW + 3);
+      const [ar, ag, ab] = parseHexToRgb(av.hex);
+
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(ax, y + 13, aBoxW, 16, 1.5, 1.5, 'F');
+      doc.setDrawColor(240, 220, 220);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(ax, y + 13, aBoxW, 16, 1.5, 1.5, 'S');
+
+      // Color badge
+      doc.setFillColor(ar, ag, ab);
+      doc.roundedRect(ax + 2, y + 15, 10, 12, 1, 1, 'F');
+      doc.setDrawColor(210, 190, 190);
+      doc.roundedRect(ax + 2, y + 15, 10, 12, 1, 1, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(160, 40, 50);
+      doc.text(av.name, ax + 14, y + 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(110, 80, 80);
+      const reasonLines = doc.splitTextToSize(av.reason, aBoxW - 16);
+      doc.text(reasonLines.slice(0, 2), ax + 14, y + 22);
+    });
+
+    y += 36;
+
+    // SECTION E: Sello de Validación del Atelier Concepción
+    doc.setFillColor(25, 20, 24);
+    doc.roundedRect(margin, y, contentWidth, 25, 2, 2, 'F');
+
+    doc.setFillColor(212, 165, 116);
+    doc.rect(margin, y, 3, 25, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(245, 225, 210);
+    doc.text('CERTIFICACIÓN DE COLORIMETRÍA PERSONAL — ATELIER CONCEPCIÓN', margin + 6, y + 7);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(210, 195, 190);
+    doc.text('Diagnóstico emitido bajo el protocolo de las 12 estaciones de Styled By Wilma.', margin + 6, y + 12);
+    doc.text('Wilma Hernández • Asesora de Imagen & Consultora Cromática • Concepción, Región del Biobío, Chile', margin + 6, y + 16.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.setTextColor(212, 165, 116);
+    doc.text('www.styledbywilma.com • Documento Válido para Asesoría & Compras', margin + 6, y + 21);
+
+    // Page 2 Footer
+    doc.setFillColor(212, 165, 116);
+    doc.rect(margin, pageHeight - 12, contentWidth, 0.4, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(140, 130, 125);
+    doc.text('Styled By Wilma • Concepción, Región del Biobío, Chile • Atelier de Colorimetría Personal', margin, pageHeight - 7);
+    doc.text('Página 2 de 2 • Fin del Dossier Oficial', pageWidth - margin, pageHeight - 7, { align: 'right' });
+
+    // Download PDF
+    const cleanSeasonName = season.spanishTitle.replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = options?.customFileName || `Styled_By_Wilma_Analisis_${cleanSeasonName}.pdf`;
+    doc.save(fileName);
+    return true;
+  } catch (error) {
+    console.error('Error generando PDF de colorimetría:', error);
+    return false;
+  }
+}
+

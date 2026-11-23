@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { AnalysisResult } from '../lib/colorAnalysis';
 import { UserProfile } from '../types';
+import { exportColorAnalysisToPDF } from '../lib/exportUtils';
 import { 
   Share2, 
   Download, 
@@ -15,7 +16,8 @@ import {
   Heart,
   Palette,
   CheckCircle2,
-  X
+  X,
+  FileDown
 } from 'lucide-react';
 
 export interface ShareMyResultsProps {
@@ -540,6 +542,16 @@ export const ShareMyResults: React.FC<ShareMyResultsProps> = ({
             <span>{copiedCaption ? '¡Copiado!' : 'Copiar Texto'}</span>
           </button>
         </div>
+
+        {/* Full PDF Dossier Option */}
+        <button
+          onClick={() => exportColorAnalysisToPDF(analysis, user)}
+          className="w-full py-3 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-900 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors border border-stone-200 shadow-2xs"
+          title="Descargar informe editorial completo en PDF de 2 páginas"
+        >
+          <FileDown className="w-4 h-4 text-rose-600" />
+          <span>Descargar Dossier Oficial en PDF (Informe Completo)</span>
+        </button>
 
         {/* Link sharing */}
         <div className="pt-2 flex items-center justify-between text-[11px] text-stone-500 border-t border-stone-100">

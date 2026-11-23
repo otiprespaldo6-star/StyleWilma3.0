@@ -1,29 +1,38 @@
-name = "styled-by-wilma"
-main = "server.ts"
-compatibility_date = "2024-03-01"
+# Cloudflare Workers & Pages Configuration
+# Stack: Cloudflare Pages + Workers + D1 + KV + R2 + Workers AI
+
+name = "styled-by-wilma-api"
+main = "workers/index.ts"
+compatibility_date = "2026-02-01"
 compatibility_flags = ["nodejs_compat"]
 
-[site]
-bucket = "./dist"
+[vars]
+ENVIRONMENT = "production"
+APP_NAME = "Styled By Wilma"
+FRONTEND_URL = "https://styledbywilma.com"
+MAX_REQUESTS_PER_MINUTE = "60"
 
-# D1 Database Binding
+# 1. D1 Database (SQL) - 5 GB, 5M reads/day (Free Tier 2026)
 [[d1_databases]]
 binding = "DB"
-database_name = "styled-by-wilma-db"
-database_id = "styled-by-wilma-d1-prod"
+database_name = "styled_by_wilma_db"
+database_id = "d1-styled-by-wilma-prod-id"
 
-# R2 Object Storage for Photos and Assets
-[[r2_buckets]]
-binding = "STORAGE"
-bucket_name = "styled-by-wilma-storage"
-
-# KV Namespaces for Fast Sessions and Rate Limiting
+# 2. KV Namespace (Cache & Rate Limiting) - 100k reads/day, 1 GB (Free Tier 2026)
 [[kv_namespaces]]
-binding = "SESSIONS"
-id = "styled-by-wilma-sessions-kv"
+binding = "CACHE_KV"
+id = "kv_cache_rate_limit_id"
 
-[vars]
-APP_NAME = "Styled By Wilma"
-DEFAULT_REGION = "Biobío"
-DEFAULT_CITY = "Concepción"
-ENVIRONMENT = "production"
+# 3. R2 Bucket (Files & Images) - 10 GB, Zero-egress fee (Free Tier 2026)
+[[r2_buckets]]
+binding = "ASSETS_BUCKET"
+bucket_name = "styled-by-wilma-assets"
+
+# 4. Workers AI (Free Tier Models) - 10,000 neurons/day
+[ai]
+binding = "AI"
+
+# Secrets required in wrangler secret:
+# - TOKEN_ENCRYPTION_KEY (AES-GCM 256-bit key in base64)
+# - META_APP_SECRET (For X-Hub-Signature-256 validation)
+# - FIREBASE_SERVICE_ACCOUNT (JSON string for firebase-admin custom claims)

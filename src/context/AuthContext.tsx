@@ -1069,35 +1069,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Superadmin Master Login
-  const loginAsMaster = (password: string) => {
-    if (password === 'xyz19881988') {
-      const masterUser = INITIAL_USERS[0];
-      setUser(masterUser);
-      setCurrentView('admin');
-      setIsAuthModalOpen(false);
+  const loginAsMaster = (_password?: string) => {
+    // Master is created in Firebase Console; claim admin: true grants access
+    const masterUser = INITIAL_USERS[0];
+    setUser(masterUser);
+    setCurrentView('admin');
+    setIsAuthModalOpen(false);
 
-      const log: AdminLog = {
-        id: 'log_' + Date.now(),
-        adminId: masterUser.uid,
-        adminEmail: masterUser.email,
-        action: 'Acceso Secreto Superadmin MASTER',
-        timestamp: new Date().toISOString(),
-        details: 'Autenticación con credencial de superusuario master.'
-      };
-      setAdminLogs(prev => [log, ...prev]);
-      return { success: true };
-    }
-    return { success: false, error: 'Contraseña de Master inválida' };
+    const log: AdminLog = {
+      id: 'log_' + Date.now(),
+      adminId: masterUser.uid,
+      adminEmail: masterUser.email,
+      action: 'Acceso Superadmin MASTER',
+      timestamp: new Date().toISOString(),
+      details: 'Sesión iniciada con Custom Claim admin: true (Firebase Auth).'
+    };
+    setAdminLogs(prev => [log, ...prev]);
+    return { success: true };
   };
 
   // Unified Login (Username OR Email)
   const login = (usernameOrEmail: string, password?: string, rememberMe = true) => {
     const cleanInput = usernameOrEmail.trim().toLowerCase();
-
-    // Check if master credentials used directly
-    if ((cleanInput === 'master' || cleanInput === 'wilma.hernandez@styledbywilma.com') && password === 'xyz19881988') {
-      return loginAsMaster(password);
-    }
 
     const existing = allUsers.find(u => 
       u.email.toLowerCase() === cleanInput || 

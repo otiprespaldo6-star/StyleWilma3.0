@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { ColorSwatch, MakeupRecommendation } from '../data/seasons';
 import { ShareMyResults } from './ShareMyResults';
 import { AIOutfitGenerator } from './AIOutfitGenerator';
+import { exportColorAnalysisToPDF } from '../lib/exportUtils';
 import { 
   Sparkles, 
   Crown, 
@@ -18,7 +19,9 @@ import {
   Share2,
   X,
   Printer,
-  Shirt
+  Shirt,
+  FileDown,
+  CheckCircle2
 } from 'lucide-react';
 
 export const AnalysisResultView: React.FC = () => {
@@ -29,6 +32,26 @@ export const AnalysisResultView: React.FC = () => {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [activeMakeupTab, setActiveMakeupTab] = useState<'labios' | 'mejillas' | 'ojos'>('labios');
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [pdfSuccess, setPdfSuccess] = useState(false);
+
+  const handleExportPDF = () => {
+    if (!currentAnalysis) return;
+    setIsExportingPDF(true);
+    setTimeout(() => {
+      try {
+        const ok = exportColorAnalysisToPDF(currentAnalysis, user);
+        if (ok) {
+          setPdfSuccess(true);
+          setTimeout(() => setPdfSuccess(false), 4000);
+        }
+      } catch (err) {
+        console.error('Error al generar PDF:', err);
+      } finally {
+        setIsExportingPDF(false);
+      }
+    }, 150);
+  };
 
   if (!currentAnalysis) {
     return (
@@ -133,6 +156,22 @@ export const AnalysisResultView: React.FC = () => {
             >
               <Share2 className="w-4 h-4 text-stone-950 group-hover:scale-110 transition-transform" />
               <span>Compartir Mis Resultados (Web Share API)</span>
+            </button>
+
+            <button
+              onClick={handleExportPDF}
+              disabled={isExportingPDF}
+              className="px-6 py-3.5 rounded-2xl bg-white hover:bg-rose-50 text-stone-950 font-extrabold text-xs shadow-lg shadow-black/25 transition-all flex items-center justify-center gap-2 cursor-pointer group border border-white/90"
+              title="Descargar informe completo de colorimetría en documento PDF"
+            >
+              <FileDown className={`w-4 h-4 text-rose-600 transition-transform ${isExportingPDF ? 'animate-bounce' : 'group-hover:scale-110'}`} />
+              <span>
+                {isExportingPDF 
+                  ? 'Generando PDF...' 
+                  : pdfSuccess 
+                  ? '¡PDF Descargado con Éxito!' 
+                  : 'Descargar Informe en PDF'}
+              </span>
             </button>
 
             <button
@@ -650,17 +689,25 @@ export const AnalysisResultView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-wrap justify-end gap-2.5 pt-2">
+              <button
+                onClick={handleExportPDF}
+                disabled={isExportingPDF}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+              >
+                <FileDown className="w-4 h-4" />
+                <span>{isExportingPDF ? 'Generando...' : 'Descargar Informe PDF'}</span>
+              </button>
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 text-xs font-bold text-stone-700 flex items-center gap-1.5"
+                className="px-4 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 text-xs font-bold text-stone-700 flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
-                <span>Imprimir / Guardar PDF</span>
+                <span>Imprimir</span>
               </button>
               <button
                 onClick={() => setShowWalletModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold"
+                className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold cursor-pointer"
               >
                 Cerrar
               </button>

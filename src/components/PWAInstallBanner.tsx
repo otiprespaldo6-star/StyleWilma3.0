@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Sparkles, CheckCircle2, Share, PlusSquare, ArrowUpRight } from 'lucide-react';
+import pwaStyles from '../styles/pwa.module.css';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

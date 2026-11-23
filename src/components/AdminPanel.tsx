@@ -44,12 +44,16 @@ import {
   Sliders,
   Printer,
   FileText,
-  Camera
+  Camera,
+  FileArchive
 } from 'lucide-react';
 import { exportToExcel, exportVisitsToPDF, exportManualToPDF, exportManualToWord } from '../lib/exportUtils';
 import { ImageUploaderWidget, PRESET_LOGO_EXAMPLE, PRESET_SAMPLE_PHOTO } from './ImageUploaderWidget';
 import { AGE_GROUPS_CONFIG } from '../data/ageGroups';
 import { VisitRecord, PlanDefinition, UserProfile, UserRole, UserPlan } from '../types';
+import adminStyles from '../styles/admin.module.css';
+import { FREE_TIER_QUOTAS_2026 } from '../lib/security';
+import { useAdmin } from '../hooks/useAdmin';
 
 export type AdminTab = 
   | 'dashboard'
@@ -119,6 +123,35 @@ export const AdminPanel: React.FC = () => {
     deleteBackup,
     setCurrentView
   } = useAuth();
+
+  const { isAdmin, isMaster, claims, refreshClaims, currentUser } = useAdmin();
+  const [isExportingSource, setIsExportingSource] = useState(false);
+
+  const handleDownloadSourceCode = async () => {
+    setIsExportingSource(true);
+    showToast('Generando ZIP del monorepo con export:source (sin node_modules)...');
+    try {
+      const response = await fetch('/api/admin/export-source');
+      if (!response.ok) {
+        throw new Error('No se pudo generar el archivo ZIP');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'styled-by-wilma-source.zip';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('¡Código fuente descargado exitosamente como ZIP!');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Error al descargar código fuente.');
+    } finally {
+      setIsExportingSource(false);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -425,7 +458,17 @@ export const AdminPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleDownloadSourceCode}
+            disabled={isExportingSource}
+            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md disabled:opacity-50"
+            title="Genera un archivo ZIP del monorepo sin node_modules mediante export:source"
+          >
+            <FileArchive className={`w-3.5 h-3.5 ${isExportingSource ? 'animate-spin' : ''}`} />
+            <span>{isExportingSource ? 'Exportando ZIP...' : 'Descargar código fuente'}</span>
+          </button>
+
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-stone-400 bg-stone-900 px-3 py-1.5 rounded-xl border border-stone-800">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
             <span>CLT (Chile): {new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -538,6 +581,126 @@ export const AdminPanel: React.FC = () => {
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Actualizar Métricas</span>
                 </button>
+              </div>
+
+              {/* Master Superusuario Card & Source Code Export Action */}
+              <div className="p-5 rounded-3xl bg-gradient-to-r from-purple-950/60 via-stone-950 to-indigo-950/60 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                <div className="space-y-1.5 max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Custom Claim: admin: true (Verificado)</span>
+                    </span>
+                    <span className="text-[10px] text-stone-400">
+                      • Firebase Auth Spark (50.000 MAU)
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-lg font-bold text-white">
+                    Superusuario Master & Monorepo de Producción
+                  </h3>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    El usuario master se gestiona en Firebase Console (la contraseña nunca se incrusta en el código). Un Cloudflare Worker con <code className="text-purple-300 font-mono">firebase-admin</code> valida la sesión y asigna el Custom Claim <code className="text-purple-300 font-mono">admin: true</code> verificado con el hook <code className="text-purple-300 font-mono">useAdmin</code>.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full md:w-auto">
+                  <button
+                    onClick={handleDownloadSourceCode}
+                    disabled={isExportingSource}
+                    className="py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-purple-900/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <FileArchive className={`w-4 h-4 ${isExportingSource ? 'animate-spin' : ''}`} />
+                    <span>{isExportingSource ? 'Empaquetando ZIP...' : 'Descargar código fuente (ZIP)'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      refreshClaims();
+                      showToast('Token de Firebase Auth y Custom Claims refrescados.');
+                    }}
+                    className="py-3 px-3.5 rounded-2xl bg-stone-900 hover:bg-stone-800 text-stone-200 text-xs font-bold border border-stone-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Forzar actualización de claims del ID token"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refrescar Claims</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2026 Free Tier Reference Quotas Dashboard */}
+              <div className="p-5 rounded-3xl bg-stone-950 border border-stone-800 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-stone-800/80 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-amber-400" />
+                      <span>Planes Gratuitos de Referencia (Arquitectura 2026)</span>
+                    </h3>
+                    <p className="text-[11px] text-stone-400 mt-0.5">
+                      Límites operativos del stack Cloudflare (Workers, D1, KV, R2, Pages, Workers AI) y Firebase Auth.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono bg-stone-900 text-stone-300 px-2.5 py-1 rounded-lg border border-stone-800">
+                    Costo Mensual Estimado: $0.00 USD
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* 1. Workers */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare Workers</span>
+                    <p className="text-xl font-bold font-mono text-purple-300">~100.000 <span className="text-xs text-stone-400 font-normal">req/día</span></p>
+                    <p className="text-[10px] text-stone-400">10 ms CPU por invocación • Límite 2026</p>
+                  </div>
+
+                  {/* 2. D1 SQL */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare D1 (SQL)</span>
+                    <p className="text-xl font-bold font-mono text-emerald-400">5 GB <span className="text-xs text-stone-400 font-normal">storage</span></p>
+                    <p className="text-[10px] text-stone-400">5.000.000 filas leídas / día</p>
+                  </div>
+
+                  {/* 3. KV */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare KV (Rate Limit)</span>
+                    <p className="text-xl font-bold font-mono text-amber-300">100.000 <span className="text-xs text-stone-400 font-normal">lecturas/día</span></p>
+                    <p className="text-[10px] text-stone-400">1 GB storage • 1.000 escrituras/día</p>
+                  </div>
+
+                  {/* 4. R2 */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare R2 (Storage)</span>
+                    <p className="text-xl font-bold font-mono text-teal-300">10 GB <span className="text-xs text-stone-400 font-normal">archivos</span></p>
+                    <p className="text-[10px] text-emerald-400">Egreso gratuito ilimitado ($0.00)</p>
+                  </div>
+
+                  {/* 5. Pages */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare Pages</span>
+                    <p className="text-xl font-bold font-mono text-blue-300">500 <span className="text-xs text-stone-400 font-normal">builds/mes</span></p>
+                    <p className="text-[10px] text-stone-400">Ancho de banda ilimitado • CSP estricta</p>
+                  </div>
+
+                  {/* 6. Workers AI */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cloudflare Workers AI</span>
+                    <p className="text-xl font-bold font-mono text-pink-300">10.000 <span className="text-xs text-stone-400 font-normal">neuronas/día</span></p>
+                    <p className="text-[10px] text-stone-400">Modelos gratuitos (Llama 3, Mistral)</p>
+                  </div>
+
+                  {/* 7. Firebase Auth */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Firebase Authentication</span>
+                    <p className="text-xl font-bold font-mono text-yellow-400">50.000 <span className="text-xs text-stone-400 font-normal">MAU</span></p>
+                    <p className="text-[10px] text-stone-400">Spark Plan • Email/Password & Google</p>
+                  </div>
+
+                  {/* 8. Seguridad AES-GCM & Meta */}
+                  <div className="p-3.5 rounded-2xl bg-stone-900/90 border border-stone-800 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-stone-400 block">Cifrado & Webhooks</span>
+                    <p className="text-base font-bold font-mono text-purple-300">AES-GCM 256</p>
+                    <p className="text-[10px] text-stone-400">Tokens en D1 + X-Hub-Signature-256</p>
+                  </div>
+                </div>
               </div>
 
               {/* KPI Cards Grid */}
@@ -1641,21 +1804,23 @@ export const AdminPanel: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Teléfono Contacto</label>
+                      <label className="block text-[11px] text-stone-400 mb-1">Teléfono Contacto (dejar en blanco para no mostrar)</label>
                       <input
                         type="text"
                         value={tempSocial.telefono}
                         onChange={(e) => setTempSocial({ ...tempSocial, telefono: e.target.value })}
-                        className="w-full px-3 py-2 text-xs bg-stone-900 border border-stone-800 rounded-xl text-white"
+                        placeholder="Ej: +56 9 1234 5678 (en blanco = no mostrado)"
+                        className="w-full px-3 py-2 text-xs bg-stone-900 border border-stone-800 rounded-xl text-white font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">Email de Soporte</label>
+                      <label className="block text-[11px] text-stone-400 mb-1">Email de Soporte / Asesoría (dejar en blanco para no mostrar)</label>
                       <input
                         type="email"
                         value={tempSocial.emailSoporte}
                         onChange={(e) => setTempSocial({ ...tempSocial, emailSoporte: e.target.value })}
-                        className="w-full px-3 py-2 text-xs bg-stone-900 border border-stone-800 rounded-xl text-white"
+                        placeholder="contacto@styledbywilma.cl (en blanco = no mostrado)"
+                        className="w-full px-3 py-2 text-xs bg-stone-900 border border-stone-800 rounded-xl text-white font-mono"
                       />
                     </div>
                     <div>

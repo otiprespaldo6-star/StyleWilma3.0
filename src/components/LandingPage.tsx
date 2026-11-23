@@ -19,16 +19,19 @@ import {
 
 export const LandingPage: React.FC = () => {
   const { 
+    user,
     setCurrentView, 
     setIsPremiumModalOpen, 
     setIsAuthModalOpen, 
     isAuthenticated,
-    appearanceConfig 
+    appearanceConfig,
+    plans
   } = useAuth();
   const [sliderPosition, setSliderPosition] = useState(50);
   const [activeSeasonTab, setActiveSeasonTab] = useState<'Primavera' | 'Verano' | 'Otoño' | 'Invierno'>('Primavera');
 
   const filteredSeasons = SEASONS_LIST.filter(s => s.subfamily === activeSeasonTab);
+  const activePlans = (plans || []).filter(p => p.isActive);
 
   return (
     <div className="space-y-24 pb-20 overflow-hidden">
@@ -444,126 +447,168 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Pricing Comparison Table (Freemium Model) */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Dynamic Membership Plans Section (Plan Gratuito + Todos los Planes VIP Activos) */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold uppercase tracking-widest text-rose-600">
-            Planes y Precios
-          </span>
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 mt-2 mb-3">
-            Elige tu nivel de asesoría
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold mb-3">
+            <Crown className="w-3.5 h-3.5 text-rose-500" />
+            <span>Membresías VIP & Asesoría Personalizada</span>
+          </div>
+          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 mb-3">
+            Planes Disponibles
           </h2>
           <p className="text-stone-600 text-sm">
-            Comienza gratis con tu análisis básico y descubre si deseas el dossier completo de estilista.
+            Comienza gratis con tu análisis básico activo o desbloquea tu membresía VIP con el dossier completo de estilismo y asesoría en Atelier Concepción.
           </p>
+
+          {/* Superadmin quick edit link */}
+          {(user?.role === 'master' || user?.role === 'admin') && (
+            <div className="mt-3">
+              <button
+                onClick={() => setCurrentView('admin')}
+                className="inline-flex items-center gap-1.5 text-xs text-purple-700 font-bold hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-lg border border-purple-200 transition-colors cursor-pointer"
+              >
+                <span>⚙️ Administrar, editar o crear nuevos planes en el Panel Superadmin</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-          {/* Plan Básico Gratuito */}
-          <div className="bg-white rounded-3xl p-8 border border-stone-200 shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
-                Plan Esencial
-              </span>
-              <div className="mt-2 mb-4 flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-stone-900 font-serif">$0</span>
-                <span className="text-xs text-stone-500">/ siempre gratis</span>
+        {/* Dynamic Plans Grid */}
+        <div className={`grid gap-6 items-stretch ${
+          activePlans.length === 1 
+            ? 'max-w-md mx-auto grid-cols-1' 
+            : activePlans.length === 2 
+            ? 'max-w-4xl mx-auto grid-cols-1 md:grid-cols-2' 
+            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+        }`}>
+          {activePlans.map((p) => {
+            const isFree = p.price === 0;
+
+            if (isFree) {
+              return (
+                <div 
+                  key={p.id} 
+                  className="bg-white rounded-3xl p-8 border border-stone-200 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between relative group"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                        {p.badge || 'Plan Gratuito Activo'}
+                      </span>
+                      <span className="text-[10px] text-stone-400 font-medium">Nuevos Usuarios</span>
+                    </div>
+
+                    <h3 className="font-serif text-2xl font-bold text-stone-900">
+                      {p.name}
+                    </h3>
+
+                    <div className="mt-3 mb-4 flex items-baseline gap-1.5">
+                      <span className="text-4xl font-bold text-stone-900 font-serif">$0</span>
+                      <span className="text-xs text-stone-500 font-medium">/ siempre gratis</span>
+                    </div>
+
+                    <p className="text-xs text-stone-600 mb-6 leading-relaxed">
+                      {p.description || 'Ideal para descubrir tu estación cromática y dar tus primeros pasos con tu paleta.'}
+                    </p>
+
+                    <div className="pt-4 border-t border-stone-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block mb-3">
+                        Incluye en este plan:
+                      </span>
+                      <ul className="space-y-2.5 text-xs text-stone-700">
+                        {(p.features || []).map((feat, fIdx) => (
+                          <li key={fIdx} className="flex items-start gap-2.5">
+                            <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                            <span className="leading-tight">{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 pt-4">
+                    <button
+                      onClick={() => setCurrentView('analyzer-photo')}
+                      className="w-full py-3.5 rounded-xl border-2 border-stone-800 hover:bg-stone-900 hover:text-white text-stone-900 text-xs font-bold transition-all cursor-pointer text-center"
+                    >
+                      Comenzar Gratis Ahora
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            // VIP / Premium Plans
+            return (
+              <div 
+                key={p.id}
+                className={`bg-gradient-to-b from-stone-900 via-rose-950 to-stone-950 rounded-3xl p-8 text-white shadow-xl border relative flex flex-col justify-between transition-all group ${
+                  p.isPopular ? 'border-amber-400/80 shadow-rose-950/40 ring-1 ring-amber-400/30' : 'border-rose-500/30'
+                }`}
+              >
+                {/* Popular Badge */}
+                {p.isPopular && (
+                  <div className="absolute -top-3 right-6 bg-gradient-to-r from-amber-400 to-rose-400 text-stone-950 text-[10px] font-black uppercase tracking-wider px-3 py-0.5 rounded-full shadow-lg flex items-center gap-1">
+                    <Crown className="w-3 h-3 fill-stone-950" />
+                    <span>Más Popular</span>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-rose-300 bg-white/10 px-2.5 py-0.5 rounded-md border border-white/20">
+                      {p.badge || 'Membresía VIP'}
+                    </span>
+                    <span className="text-[10px] text-rose-200/80 font-mono">
+                      {p.currency || 'USD'}
+                    </span>
+                  </div>
+
+                  <h3 className="font-serif text-2xl font-bold text-white">
+                    {p.name}
+                  </h3>
+
+                  <div className="mt-3 mb-4 flex items-baseline gap-1.5">
+                    <span className="text-4xl font-bold font-serif text-amber-300">
+                      ${p.price.toFixed(2)}
+                    </span>
+                    <span className="text-xs text-rose-200">
+                      / {p.billingPeriod === 'monthly' ? 'mes' : p.billingPeriod === 'yearly' ? 'año' : 'pago único'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-rose-100/80 mb-6 leading-relaxed">
+                    {p.description}
+                  </p>
+
+                  <div className="pt-4 border-t border-rose-900/50">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-300/80 block mb-3">
+                      Características VIP:
+                    </span>
+                    <ul className="space-y-2.5 text-xs text-stone-200">
+                      {(p.features || []).map((feat, fIdx) => (
+                        <li key={fIdx} className="flex items-start gap-2.5">
+                          <Check className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <span className="leading-tight">{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-4">
+                  <button
+                    onClick={() => setIsPremiumModalOpen(true)}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 hover:from-amber-300 hover:to-pink-400 text-stone-950 text-xs font-black shadow-lg shadow-rose-900/40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Crown className="w-4 h-4 text-stone-950" />
+                    <span>Elegir Plan {p.name} (${p.price.toFixed(2)})</span>
+                  </button>
+                </div>
               </div>
-              <p className="text-xs text-stone-600 mb-6">
-                Ideal para conocer tu estación y empezar a entender tu paleta.
-              </p>
-
-              <ul className="space-y-3 text-xs text-stone-700">
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Clasificación en 1 de las 12 estaciones maestras</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Análisis fotográfico con IA o cuestionario</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Paleta básica de 6 colores principales</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Guía básica de metales (oro vs plata)</span>
-                </li>
-                <li className="flex items-center gap-2.5 text-stone-400">
-                  <span className="w-4 h-4 flex items-center justify-center text-stone-300">✕</span>
-                  <span>Sin visor completo de tonos de maquillaje HEX</span>
-                </li>
-                <li className="flex items-center gap-2.5 text-stone-400">
-                  <span className="w-4 h-4 flex items-center justify-center text-stone-300">✕</span>
-                  <span>Sin armario cápsula de temporada descargable</span>
-                </li>
-              </ul>
-            </div>
-
-            <button
-              onClick={() => setCurrentView('analyzer-photo')}
-              className="mt-8 w-full py-3.5 rounded-xl border border-stone-300 hover:border-rose-400 text-stone-800 text-xs font-bold transition-all cursor-pointer"
-            >
-              Comenzar Gratis Ahora
-            </button>
-          </div>
-
-          {/* Plan VIP Premium */}
-          <div className="bg-gradient-to-b from-rose-900 via-rose-950 to-stone-900 rounded-3xl p-8 text-white shadow-xl border border-rose-500/40 relative flex flex-col justify-between">
-            <div className="absolute -top-3.5 right-8 bg-gradient-to-r from-amber-400 to-rose-400 text-stone-900 text-xs font-extrabold uppercase tracking-wider px-3.5 py-1 rounded-full shadow-lg flex items-center gap-1">
-              <Crown className="w-3.5 h-3.5 fill-stone-900" />
-              <span>Más Popular</span>
-            </div>
-
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-300">
-                Pase VIP de Estilismo
-              </span>
-              <div className="mt-2 mb-4 flex items-baseline gap-1">
-                <span className="text-4xl font-bold font-serif">$4.99</span>
-                <span className="text-xs text-rose-200">/ mes (cancela cuando quieras)</span>
-              </div>
-              <p className="text-xs text-rose-100/80 mb-6">
-                Dossier integral para reinventar tu armario y tu neceser de maquillaje.
-              </p>
-
-              <ul className="space-y-3 text-xs text-stone-200">
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-semibold text-white">Todo lo del plan gratuito incluido</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Paleta ampliada de 12 colores con códigos HEX y RGB</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Fórmulas de outfits para trabajo, diario y eventos</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Vanity de maquillaje con tonos exactos de labiales y colorete</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Draping virtual ilimitado con tus fotos personales</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Tarjeta de bolsillo digital descargable para compras</span>
-                </li>
-              </ul>
-            </div>
-
-            <button
-              onClick={() => setIsPremiumModalOpen(true)}
-              className="mt-8 w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-rose-400 hover:from-amber-300 hover:to-rose-300 text-stone-900 text-xs font-bold shadow-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
-            >
-              <Crown className="w-4 h-4 text-stone-900" />
-              <span>Desbloquear Todo por $4.99/mes</span>
-            </button>
-          </div>
+            );
+          })}
         </div>
       </section>
 
